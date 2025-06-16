@@ -17,7 +17,7 @@ Using Dataset crawled from Fahasa (Sorry fahasa), 10631 books with features: id,
 - Chatbot: Ask question and get book suggestions (GPT-powered)
 - Explanation generator: Give users a reason why they might like the book (GPT-powered)
 ### Admin panel
-- Admin login 
+- Admin login '
 - View & delete users
 - Search & delete books in Milvus
 - View OpenAI token usage (input/output by purpose)
@@ -32,7 +32,7 @@ Using Dataset crawled from Fahasa (Sorry fahasa), 10631 books with features: id,
 - `suggest_words.py`: Autocomplete keyword suggestion logic  
 - `create_admin.py`: Script to create initial admin account  
 
-### Tech Stack:
+## Tech Stack:
 - **FastAPI**: Web API framework
 - **SQLAlchemy**: ORM for MySQL
 - **MySQL**: User & log database
