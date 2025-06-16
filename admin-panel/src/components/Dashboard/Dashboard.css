@@ -1,0 +1,49 @@
+.admin-dashboard {
+    padding: 2rem;
+    font-family: Arial, sans-serif;
+}
+
+.overview p {
+    margin: 0.2rem 0;
+}
+
+.search-bar {
+    margin: 1rem 0;
+    display: flex;
+    gap: 1rem;
+}
+
+.search-bar input {
+    padding: 6px;
+    font-size: 1rem;
+    width: 300px;
+}
+
+.search-bar button {
+    padding: 6px 12px;
+    cursor: pointer;
+}
+
+.section {
+    margin-top: 1.5rem;
+}
+
+.section ul {
+    padding-left: 1.2rem;
+}
+
+.section li {
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    max-width: 600px;
+}
+
+.section li button {
+    margin-left: 1rem;
+    background-color: crimson;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    cursor: pointer;
+}
