@@ -20,6 +20,7 @@ Using Dataset crawled from Fahasa (Sorry fahasa), 10631 books with features: id,
 - Admin login '
 - View & delete users
 - Search & delete books in Milvus
+- Upload books on Milvus (you can create yourself a new collection there)
 - View OpenAI token usage (input/output by purpose)
 
 ### File Overview (Which mainly used for this project):
