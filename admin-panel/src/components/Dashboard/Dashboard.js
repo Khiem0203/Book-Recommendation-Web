@@ -1,44 +1,54 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import "./Dashboard.css";
 import { useNavigate } from "react-router-dom";
 
 function Dashboard() {
     const [overview, setOverview] = useState({ totalUsers: 0, totalBooks: 0 });
-    const [query, setQuery] = useState("");
+    const [userQuery, setUserQuery] = useState("");
+    const [bookQuery, setBookQuery] = useState("");
     const [users, setUsers] = useState([]);
     const [books, setBooks] = useState([]);
-    const [tokenLogs, setTokenLogs] = useState({ summary: {}, logs: [] });
+    const [tokenLogs, setTokenLogs] = useState({});
+    const [uploading, setUploading] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [collections, setCollections] = useState([]);
+    const [selectedCollection, setSelectedCollection] = useState("");
+    const [customCollection, setCustomCollection] = useState("");
     const navigate = useNavigate();
     const token = localStorage.getItem("token");
 
-    const fetchOverview = async () => {
-        try {
-            const [bookRes, userRes] = await Promise.all([
-                fetch("http://127.0.0.1:8080/admin/books/count", {
-                    headers: { Authorization: `Bearer ${token}` }
-                }),
-                fetch("http://127.0.0.1:8080/admin/users/search?query=", {
-                    headers: { Authorization: `Bearer ${token}` }
-                })
-            ]);
-            const bookData = await bookRes.json();
-            const userData = await userRes.json();
-            setOverview({ totalBooks: bookData.total_books, totalUsers: userData.length });
-        } catch {
-            alert("Không thể lấy dữ liệu hệ thống.");
-        }
-    };
+    const fetchOverview = useCallback(async () => {
+        const [bookRes, userRes] = await Promise.all([
+            fetch("http://127.0.0.1:8080/admin/books/count", {
+                headers: { Authorization: `Bearer ${token}` }
+            }),
+            fetch("http://127.0.0.1:8080/admin/users", {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+        ]);
+        const bookData = await bookRes.json();
+        const userData = await userRes.json();
+        setOverview({ totalBooks: bookData.total_books, totalUsers: userData.length });
+    }, [token]);
 
-    const fetchTokenLogs = async () => {
+    const fetchTokenLogs = useCallback(async () => {
         const res = await fetch("http://127.0.0.1:8080/admin/token-usage", {
             headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
-        setTokenLogs(data);
-    };
+        setTokenLogs(data.summary.by_purpose || {});
+    }, [token]);
+
+    const fetchCollections = useCallback(async () => {
+        const res = await fetch("http://127.0.0.1:8080/admin/collections", {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        setCollections(data.collections || []);
+    }, [token]);
 
     const searchUsers = async () => {
-        const res = await fetch(`http://127.0.0.1:8080/admin/users/search?query=${query}`, {
+        const res = await fetch(`http://127.0.0.1:8080/admin/users/search?query=${userQuery}`, {
             headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
@@ -54,7 +64,7 @@ function Dashboard() {
     };
 
     const searchBooks = async () => {
-        const res = await fetch(`http://127.0.0.1:8080/admin/books/search?query=${query}`, {
+        const res = await fetch(`http://127.0.0.1:8080/admin/books/search?query=${bookQuery}`, {
             headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
@@ -69,6 +79,36 @@ function Dashboard() {
         searchBooks();
     };
 
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0];
+        const formData = new FormData();
+        const collectionName = customCollection || selectedCollection;
+        if (!collectionName) return alert("Vui lòng chọn hoặc nhập tên collection");
+        formData.append("file", file);
+        formData.append("collection_name", collectionName);
+        setUploading(true);
+        setProgress(0);
+        const interval = setInterval(() => {
+            setProgress((prev) => (prev < 90 ? prev + 10 : prev));
+        }, 300);
+        try {
+            const res = await fetch("http://127.0.0.1:8080/admin/upload-books", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData
+            });
+            const data = await res.json();
+            clearInterval(interval);
+            setProgress(100);
+            setTimeout(() => setUploading(false), 1000);
+            alert(data.message || "Upload xong");
+        } catch {
+            clearInterval(interval);
+            setUploading(false);
+            alert("Lỗi khi upload file.");
+        }
+    };
+
     const handleLogout = () => {
         localStorage.removeItem("token");
         navigate("/");
@@ -77,7 +117,8 @@ function Dashboard() {
     useEffect(() => {
         fetchOverview();
         fetchTokenLogs();
-    }, []);
+        fetchCollections();
+    }, [fetchOverview, fetchTokenLogs, fetchCollections]);
 
     return (
         <div className="dashboard-container">
@@ -85,25 +126,19 @@ function Dashboard() {
                 <h2>Admin Dashboard</h2>
                 <button onClick={handleLogout}>Logout</button>
             </div>
-
             <div className="overview">
                 <p><strong>Tổng số user:</strong> {overview.totalUsers}</p>
                 <p><strong>Tổng số sách:</strong> {overview.totalBooks}</p>
             </div>
-
-            <div className="search-bar">
+            <div className="section">
+                <h3>Tìm kiếm người dùng</h3>
                 <input
                     type="text"
-                    placeholder="Tìm kiếm user hoặc sách"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Tìm kiếm user"
+                    value={userQuery}
+                    onChange={(e) => setUserQuery(e.target.value)}
                 />
                 <button onClick={searchUsers}>Tìm User</button>
-                <button onClick={searchBooks}>Tìm Sách</button>
-            </div>
-
-            <div className="section">
-                <h3>Danh sách người dùng</h3>
                 <ul>
                     {users.map(user => (
                         <li key={user.id}>
@@ -113,9 +148,15 @@ function Dashboard() {
                     ))}
                 </ul>
             </div>
-
             <div className="section">
-                <h3>Danh sách sách (Milvus)</h3>
+                <h3>Tìm kiếm sách</h3>
+                <input
+                    type="text"
+                    placeholder="Tìm kiếm sách"
+                    value={bookQuery}
+                    onChange={(e) => setBookQuery(e.target.value)}
+                />
+                <button onClick={searchBooks}>Tìm Sách</button>
                 <ul>
                     {books.map(book => (
                         <li key={book.id}>
@@ -125,18 +166,42 @@ function Dashboard() {
                     ))}
                 </ul>
             </div>
-
             <div className="section">
+                <h3>Upload Database (CSV)</h3>
+                <label>Chọn collection có sẵn:</label>
+                <select value={selectedCollection} onChange={(e) => setSelectedCollection(e.target.value)}>
+                    <option value="">-- Chọn --</option>
+                    {collections.map((c, i) => (
+                        <option key={i} value={c}>{c}</option>
+                    ))}
+                </select>
+                <label>Hoặc nhập tên collection mới:</label>
+                <input
+                    type="text"
+                    placeholder="Tên collection mới"
+                    value={customCollection}
+                    onChange={(e) => setCustomCollection(e.target.value)}
+                />
+                <input type="file" accept=".csv" onChange={handleFileUpload} />
+                {uploading && (
+                    <div className="progress-container">
+                        <div className="progress-bar" style={{ width: `${progress}%` }} />
+                        <p>Đang upload và xử lý... {progress}%</p>
+                    </div>
+                )}
+            </div>
+            <div className="section token-stats">
                 <h3>Thống kê OpenAI Token</h3>
                 <ul>
-                    {tokenLogs.summary.by_purpose &&
-                        Object.entries(tokenLogs.summary.by_purpose).map(([purpose, usage]) => (
-                            <li key={purpose}>
-                                <strong>{purpose}</strong>: input = {usage.input}, output = {usage.output}
-                            </li>
-                        ))}
+                    <li><strong>Embedding</strong>: input = {tokenLogs.embedding?.input || 0}, output = {tokenLogs.embedding?.output || 0}</li>
+                    <li><strong>Query</strong>: input = {tokenLogs.bookrcm?.input || 0}, output = {tokenLogs.bookrcm?.output || 0}</li>
+                    <li><strong>Explanation</strong>: input = {tokenLogs.explanation?.input || 0}, output = {tokenLogs.explanation?.output || 0}</li>
+                    <li><strong>Chatbot</strong>: input = {tokenLogs.chatbot?.input || 0}, output = {tokenLogs.chatbot?.output || 0}</li>
                 </ul>
-                <p><strong>Tổng cộng:</strong> {tokenLogs.summary.total_tokens || 0} tokens</p>
+                <p><strong>Tổng cộng:</strong> {
+                    Object.values(tokenLogs).reduce((sum, p) =>
+                        sum + (p.input || 0) + (p.output || 0), 0)
+                } tokens</p>
             </div>
         </div>
     );

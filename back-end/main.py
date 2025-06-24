@@ -1,10 +1,12 @@
-from fastapi import FastAPI, Query, HTTPException, Depends
+import shutil
+from fastapi import FastAPI, Query, HTTPException, Depends, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from crud import create_user, get_user_by_username_or_email, add_to_favorites, is_favorites, remove_from_favorites
 from userdb import get_db, SessionLocal
 from model import RegisterUser, User, Favorite, TokenData, UserInDB, FavoriteInDB, AdminInDB
-from data.openai.query import recommend_books
+from data.embedding.query import recommend_books
+from data.embedding.frontend_embedding import embedding
 from pydantic import BaseModel
 from openai import AsyncOpenAI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +16,7 @@ from fastapi.security import OAuth2PasswordBearer
 from suggest_words import fetch_book_suggestions
 from sqlalchemy import or_, text
 from pymilvus import connections, Collection
+from pymilvus import utility
 import os
 import getpass
 
@@ -328,3 +331,35 @@ def get_token_usage(db: Session = Depends(get_db), current_admin: AdminInDB = De
         },
         "logs": logs
     }
+
+@app.get("/admin/collections")
+def list_collections(current_admin: AdminInDB = Depends(get_current_admin)):
+    try:
+        return {"collections": utility.list_collections()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/upload-books")
+def upload_books(
+    file: UploadFile = File(...),
+    collection_name: str = Form(...),
+    current_admin: AdminInDB = Depends(get_current_admin)
+):
+    try:
+        tmp_path = f"/tmp/{file.filename}"
+        with open(tmp_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        count, in_tokens, out_tokens = embedding(tmp_path, collection_name=collection_name)
+
+        db = SessionLocal()
+        db.execute(
+            text("INSERT INTO openai_logs (purpose, input_tokens, output_tokens) VALUES (:p, :in_t, :out_t)"),
+            {"p": "embedding", "in_t": in_tokens, "out_t": out_tokens}
+        )
+        db.commit()
+        db.close()
+
+        return {"message": f"{count} books embedded to '{collection_name}'"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
