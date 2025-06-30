@@ -96,6 +96,10 @@ def login_user(user: User, db: Session = Depends(get_db)):
     access_token = create_access_token(data={"sub": db_user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
+@app.post("/logout/")
+def logout(current_user: UserInDB = Depends(get_current_user)):
+    return {"message": f"User {current_user.username} logged out"}
+
 @app.post("/admin/login/")
 def login_admin(user: User, db: Session = Depends(get_db)):
     db_admin = db.query(AdminInDB).filter(
@@ -105,6 +109,10 @@ def login_admin(user: User, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Invalid admin credentials")
     token = create_access_token(data={"sub": db_admin.username, "admin": True})
     return {"access_token": token, "token_type": "bearer"}
+
+@app.post("/admin/logout/")
+def admin_logout(current_admin: AdminInDB = Depends(get_current_admin)):
+    return {"message": f"Admin {current_admin.username} logged out"}
 
 @app.get("/logininfo")
 def get_user_info(current_user: UserInDB = Depends(get_current_user)):

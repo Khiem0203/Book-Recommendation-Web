@@ -110,6 +110,15 @@ function Dashboard() {
     };
 
     const handleLogout = () => {
+        const token = localStorage.getItem("token");
+        try {
+            await fetch("http://127.0.0.1:8080/admin/logout/", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` }
+            });
+        } catch (err) {
+            console.error("Admin logout error:", err);
+        }
         localStorage.removeItem("token");
         navigate("/");
     };
